@@ -140,7 +140,8 @@ CREATE TABLE workloads (
   allow_start          boolean NOT NULL DEFAULT false,
   allow_stop           boolean NOT NULL DEFAULT false,
   replication_source   text NOT NULL DEFAULT 'none' CHECK (replication_source IN ('none','pve_replication','pve_backup')),
-  backup_storage       text,                    -- storage id for pve_backup
+  replication_vmid     integer,                 -- guest id whose replication/backup proves freshness (defaults to vmid)
+  backup_storage       text,                    -- storage id for pve_backup (e.g. a PBS datastore visible from this node)
   start_order          integer NOT NULL DEFAULT 100,
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now(),
