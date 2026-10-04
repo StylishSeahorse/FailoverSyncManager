@@ -435,9 +435,8 @@ const promoteWorkloads: StepDef = {
 // ---------------------------------------------------------------- step 7
 async function pollChecks(ctx: StepContext, checks: HealthCheck[], timeoutS: number) {
   const deadline = Date.now() + timeoutS * 1000;
-  let last: Array<{ check: HealthCheck; ok: boolean; message: string }> = [];
   for (;;) {
-    last = await Promise.all(checks.map(async (c) => ({ check: c, ...(await runCheck(c, ctx.checkDeps)) })));
+    const last = await Promise.all(checks.map(async (c) => ({ check: c, ...(await runCheck(c, ctx.checkDeps)) })));
     if (last.every((r) => r.ok || !r.check.critical)) return { ok: true, results: last };
     if (Date.now() >= deadline) return { ok: false, results: last };
     await ctx.sleep(ctx.pollMs);

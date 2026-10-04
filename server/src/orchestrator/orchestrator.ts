@@ -56,6 +56,7 @@ export interface OrchestratorOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+// Advisory lock (key, schema) so one controller per schema runs at a time.
 const OP_LOCK_KEY = 7_340_002;
 
 interface Hooks {
@@ -261,7 +262,7 @@ export class FailoverOrchestrator {
     let lockHeld = false;
     let handedOff = false;
     try {
-      const { rows } = await lockClient.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1) AS ok', [OP_LOCK_KEY]);
+      const { rows } = await lockClient.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1, hashtext(current_schema())) AS ok', [OP_LOCK_KEY]);
       lockHeld = Boolean(rows[0]?.ok);
       if (!lockHeld) throw new OperationConflictError('Another failover operation is running');
 
@@ -315,7 +316,7 @@ export class FailoverOrchestrator {
       return op;
     } finally {
       if (!handedOff) {
-        if (lockHeld) await lockClient.query('SELECT pg_advisory_unlock($1)', [OP_LOCK_KEY]).catch(() => undefined);
+        if (lockHeld) await lockClient.query('SELECT pg_advisory_unlock($1, hashtext(current_schema()))', [OP_LOCK_KEY]).catch(() => undefined);
         lockClient.release();
       }
     }
@@ -446,7 +447,7 @@ export class FailoverOrchestrator {
       await fail('internal', (e as Error).message).catch(() => undefined);
     } finally {
       await this.store.clearOperation(op.id).catch(() => undefined);
-      await lockClient.query('SELECT pg_advisory_unlock($1)', [OP_LOCK_KEY]).catch(() => undefined);
+      await lockClient.query('SELECT pg_advisory_unlock($1, hashtext(current_schema()))', [OP_LOCK_KEY]).catch(() => undefined);
       lockClient.release();
     }
   }
