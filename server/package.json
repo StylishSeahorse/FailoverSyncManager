@@ -11,7 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src test",
     "test": "vitest run",
-    "migrate": "node dist/db/cli.js"
+    "migrate": "node dist/db/cli.js",
+    "demo": "tsx test/demo.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",

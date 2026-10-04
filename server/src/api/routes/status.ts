@@ -45,6 +45,7 @@ export async function statusRoutes(api: Api, ctx: ApiContext) {
         ? { status: 'CONNECTED', message: 'Cloudflare API reachable' }
         : { status: cfErr ? 'ERROR' : 'UNKNOWN', message: cfErr?.state.lastMessage ?? 'No results yet' };
 
+    const allWorkloads = await s.repos.workloads.list();
     const applications = apps.map((app) => {
       const perSite = Object.fromEntries(
         sites.map((site) => {
@@ -55,6 +56,9 @@ export async function statusRoutes(api: Api, ctx: ApiContext) {
       const standby = sites.find((x) => x.id !== (app.activeSiteId ?? ctl.activeSiteId));
       const rc = standby && views.find((v) => v.check.type === 'replication' && v.check.applicationId === app.id && v.check.siteId === standby.id);
       const age = rc && typeof rc.state.lastObserved?.ageSeconds === 'number' ? (rc.state.lastObserved.ageSeconds as number) : null;
+      // A cold standby's application checks fail by design until failover starts its VMs.
+      const standbyWorkloads = standby ? allWorkloads.filter((w) => w.applicationId === app.id && w.siteId === standby.id) : [];
+      const standbyMode = !standbyWorkloads.length ? null : standbyWorkloads.every((w) => w.standbyState === 'stopped') ? 'cold' : 'warm';
       return {
         id: app.id,
         slug: app.slug,
@@ -62,6 +66,8 @@ export async function statusRoutes(api: Api, ctx: ApiContext) {
         enabled: app.enabled,
         failoverPriority: app.failoverPriority,
         activeSiteId: app.activeSiteId ?? ctl.activeSiteId,
+        standbySiteId: standby?.id ?? null,
+        standbyMode,
         perSite,
         replication: { ageSeconds: age, maxAgeSeconds: app.maxReplicationAgeSeconds, safety: classifyAge(age, app.maxReplicationAgeSeconds), message: rc?.state.lastMessage ?? 'No replication check configured' },
       };
