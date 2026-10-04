@@ -4,7 +4,7 @@ export type DimensionStatus = 'HEALTHY' | 'WARNING' | 'DEGRADED' | 'FAILED' | 'U
 
 export interface CheckView {
   check: HealthCheck;
-  state: Pick<HealthCheckState, 'status' | 'lastMessage' | 'consecutiveFailures' | 'firstFailureAt' | 'lastResultAt'>;
+  state: Pick<HealthCheckState, 'status' | 'lastMessage' | 'consecutiveFailures' | 'firstFailureAt' | 'lastResultAt'> & { lastObserved?: Record<string, unknown> };
 }
 
 export interface Dimension {

@@ -8,10 +8,12 @@ import { FakeServer, type FakeResponse } from './FakeServer.js';
 export class FakeApp extends FakeServer {
   routes = new Map<string, FakeResponse>();
   down = false;
+  /** Optional liveness predicate, e.g. "the VM behind this app is running". */
+  upWhen: (() => boolean) | null = null;
 
   constructor(public siteMarker: string) {
     super((req): FakeResponse => {
-      if (this.down) return { status: 502, body: '<html>502 Bad Gateway</html>', headers: { 'content-type': 'text/html' } };
+      if (this.down || (this.upWhen && !this.upWhen())) return { status: 502, body: '<html>502 Bad Gateway</html>', headers: { 'content-type': 'text/html' } };
       const r = this.routes.get(req.path) ?? { status: 404, body: 'not found' };
       return { ...r, headers: { 'x-served-by': this.siteMarker, ...(r.headers ?? {}) } };
     });

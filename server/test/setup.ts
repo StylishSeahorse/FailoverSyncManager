@@ -15,12 +15,22 @@ process.env.LOG_LEVEL ??= 'silent';
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '::ffff:127.0.0.1']);
 const originalConnect = net.Socket.prototype.connect;
 
+type Lookup = (h: string, o: object, cb: (e: unknown, addr: unknown) => void) => void;
+
 function hostOf(args: unknown[]): string | undefined {
   const first = args[0];
   if (Array.isArray(first)) return hostOf(first);
   if (first && typeof first === 'object') {
-    const o = first as { host?: string; path?: string };
+    const o = first as { host?: string; path?: string; lookup?: Lookup };
     if (o.path) return undefined; // unix socket
+    // undici dials an IP with a Host/SNI name by supplying a lookup that returns the IP.
+    if (o.lookup && o.host) {
+      let resolved: string | undefined;
+      o.lookup(o.host, {}, (_e, addr) => {
+        resolved = typeof addr === 'string' ? addr : undefined;
+      });
+      return resolved ?? o.host;
+    }
     return o.host ?? 'localhost';
   }
   if (typeof first === 'number') return typeof args[1] === 'string' ? args[1] : 'localhost';

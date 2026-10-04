@@ -1,4 +1,4 @@
-import { Agent, request as undiciRequest, errors as undiciErrors, type Dispatcher } from 'undici';
+import { Agent, buildConnector, request as undiciRequest, errors as undiciErrors, type Dispatcher } from 'undici';
 import { redact } from '../security/redact.js';
 import { EgressGuard } from './egress.js';
 
@@ -54,17 +54,25 @@ export class HttpClient implements HttpClientLike {
     return this.guard;
   }
 
-  private agentFor(tls?: TlsOptions): Dispatcher {
+  /**
+   * Every connection goes through a connector that re-checks the egress
+   * allow-list against the address actually dialled (defence in depth beyond
+   * the URL check in request()).
+   */
+  private agentFor(tls: TlsOptions | undefined): Dispatcher {
     const key = `${tls?.insecure ? 'i' : 's'}:${tls?.caPem ?? ''}`;
     let agent = this.agents.get(key);
     if (!agent) {
-      agent = new Agent({
-        connect: {
-          rejectUnauthorized: !tls?.insecure,
-          ...(tls?.caPem ? { ca: tls.caPem } : {}),
-        },
-        keepAliveTimeout: 10_000,
-      });
+      const base = buildConnector({ rejectUnauthorized: !tls?.insecure, ...(tls?.caPem ? { ca: tls.caPem } : {}) });
+      const guard = this.guard;
+      const connect: buildConnector.connector = (opts, cb) => {
+        if (!guard.isAllowed(opts.hostname)) {
+          cb(new Error(`Outbound connection to "${opts.hostname}" blocked by egress allow-list`), null);
+          return;
+        }
+        base(opts, cb);
+      };
+      agent = new Agent({ connect, keepAliveTimeout: 10_000 });
       this.agents.set(key, agent);
     }
     return agent;

@@ -73,3 +73,12 @@ describe('test safety net', () => {
     expect(() => net.connect(443, '1.1.1.1')).toThrow(/TEST SAFETY/);
   });
 });
+
+describe('Host header override', () => {
+  it('dials the URL host, not the Host header name', async () => {
+    const client = new HttpClient(new EgressGuard(['127.0.0.1']));
+    const res = await client.request({ method: 'GET', url: `${base}/h`, headers: { host: 'www.example.com' } });
+    expect(res.status).toBe(200);
+    await client.close();
+  });
+});
