@@ -21,7 +21,9 @@ export class FakeProxmox extends FakeServer {
   storage = [{ storage: 'local-zfs', active: 1, enabled: 1, total: 1e12, used: 3e11, avail: 7e11, content: 'images,rootdir' }];
   replication: Array<{ id: string; guest: number; last_sync: number; fail_count: number; error?: string }> = [];
   backups: Array<{ storage: string; vmid: number; ctime: number; volid: string }> = [];
-  private tasks = new Map<string, { status: string; exitstatus?: string }>();
+  /** Delay before a power task completes, to exercise waiting and cancellation. */
+  taskDelayMs = 0;
+  private tasks = new Map<string, { status: string; exitstatus?: string; doneAt: number }>();
   private taskSeq = 0;
 
   constructor(nodeName: string) {
@@ -69,17 +71,21 @@ export class FakeProxmox extends FakeServer {
       if (action === 'current') return data({ vmid: g.vmid, name: g.name, status: g.status, qmpstatus: g.status });
       if (req.method !== 'POST') return { status: 501, body: { data: null } };
       const upid = `UPID:${this.nodeName}:${(++this.taskSeq).toString(16)}:qm${action}:${g.vmid}:fsm@pve!fsm:`;
+      const doneAt = Date.now() + this.taskDelayMs;
       if (action === 'start' && g.failStart) {
-        this.tasks.set(upid, { status: 'stopped', exitstatus: g.failStart });
+        this.tasks.set(upid, { status: 'stopped', exitstatus: g.failStart, doneAt });
       } else {
-        g.status = action === 'start' || action === 'reboot' ? 'running' : 'stopped';
-        this.tasks.set(upid, { status: 'stopped', exitstatus: 'OK' });
+        const next = action === 'start' || action === 'reboot' ? 'running' : 'stopped';
+        if (this.taskDelayMs) setTimeout(() => (g.status = next), this.taskDelayMs);
+        else g.status = next;
+        this.tasks.set(upid, { status: 'stopped', exitstatus: 'OK', doneAt });
       }
       return data(upid);
     }
     if ((m = rest.match(/^\/tasks\/([^/]+)\/status$/))) {
       const t = this.tasks.get(decodeURIComponent(m[1]!));
-      return t ? data(t) : { status: 500, body: { data: null }, headers: { 'x-proxmox-error': 'no such task' } };
+      if (t && Date.now() < t.doneAt) return data({ status: 'running' });
+      return t ? data({ status: t.status, exitstatus: t.exitstatus }) : { status: 500, body: { data: null }, headers: { 'x-proxmox-error': 'no such task' } };
     }
     return { status: 501, body: { data: null }, headers: { 'x-proxmox-error': `Method '${req.method} ${p}' not implemented` } };
   }

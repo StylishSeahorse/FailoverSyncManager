@@ -280,7 +280,7 @@ CREATE TABLE operations (
   verdict           text,                         -- READY/NOT_READY for dry runs
   source_site_id    uuid REFERENCES sites(id),
   target_site_id    uuid REFERENCES sites(id),
-  requested_by      uuid REFERENCES users(id),
+  requested_by      uuid REFERENCES users(id) ON DELETE SET NULL,
   requested_by_name text NOT NULL,
   acknowledged      text[] NOT NULL DEFAULT '{}', -- overridable blockers explicitly accepted
   override_reason   text,

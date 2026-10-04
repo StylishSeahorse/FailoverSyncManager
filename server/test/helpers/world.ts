@@ -110,6 +110,12 @@ export class World {
       propagationWaitSeconds: 0,
       verifyTimeoutSeconds: 3,
     });
+    for (const [id, name, role] of [
+      ['00000000-0000-0000-0000-0000000000aa', 'admin', 'admin'],
+      ['00000000-0000-0000-0000-0000000000bb', 'operator', 'operator'],
+    ]) {
+      await this.t.db.query(`INSERT INTO users(id, username, password_hash, role) VALUES ($1,$2,'x',$3)`, [id, name, role]);
+    }
     this.siteA = await repos.sites.create({ code: 'A', name: 'Site A', designatedRole: 'primary' });
     this.siteB = await repos.sites.create({ code: 'B', name: 'Site B', designatedRole: 'secondary', hostsController: true });
 
@@ -200,6 +206,26 @@ export class World {
     const t = this.cf.tunnels.get(TUN_A)!;
     t.status = 'down';
     t.connections = [];
+  }
+
+  /** Brings Site A back (new ports), updating the stored configuration to match. */
+  async restoreSiteA() {
+    await Promise.all([this.pveA.start(), this.npmA.start(), this.appA.start()]);
+    this.siteAUp = true;
+    this.sdwanUp = true;
+    const t = this.cf.tunnels.get(TUN_A)!;
+    t.status = 'healthy';
+    t.connections = [{ colo_name: 'LHR', id: 'restored' }];
+    const { repos } = this.s;
+    for (const p of await repos.proxmox.list({ siteId: this.siteA.id })) await repos.proxmox.update(p.id, { baseUrl: this.pveA.url });
+    for (const n of await repos.npm.list({ siteId: this.siteA.id })) await repos.npm.update(n.id, { baseUrl: this.npmA.url });
+    for (const c of await repos.healthChecks.list({ siteId: this.siteA.id })) {
+      if (c.type === 'tcp') await repos.healthChecks.update(c.id, { config: { ...c.config, port: Number(new URL(this.pveA.url).port) } });
+      if (c.type === 'http' && c.category === 'application') {
+        const u = new URL(String(c.config.url));
+        await repos.healthChecks.update(c.id, { config: { ...c.config, url: `${this.appA.url}${u.pathname}` } });
+      }
+    }
   }
 
   /** Runs every check for both sites `rounds` times (deterministic stand-in for the scheduler). */
