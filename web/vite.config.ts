@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // The API sets SameSite=Strict cookies; proxying keeps everything same-origin in development.
-    proxy: { '/api': 'http://127.0.0.1:8080', '/healthz': 'http://127.0.0.1:8080' },
+    proxy: { '/api': 'http://127.0.0.1:3000', '/healthz': 'http://127.0.0.1:3000' },
   },
   build: { outDir: 'dist', sourcemap: true },
   test: {

@@ -1,5 +1,7 @@
 # Documentation
 
+- [Operator guide](operator-guide.md): deployment, least-privilege credentials, health check configuration, running a failover
+
 ## Design (spec §33)
 
 1. [Analysis, dangerous assumptions, missing information](design/01-analysis.md)

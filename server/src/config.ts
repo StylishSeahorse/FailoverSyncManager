@@ -24,7 +24,6 @@ const EnvSchema = z.object({
   FSM_RESULT_RETENTION_DAYS: z.coerce.number().int().min(1).default(14),
   FSM_SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(12),
   FSM_SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).default(30),
-  FSM_WEB_DIST: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 });
 
