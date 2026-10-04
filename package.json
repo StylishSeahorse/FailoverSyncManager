@@ -1,0 +1,13 @@
+{
+  "name": "failoversyncmanager",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["server", "web"],
+  "scripts": {
+    "build": "npm run build -w server && npm run build -w web",
+    "test": "npm test -w server && npm test -w web",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "lint": "npm run lint -w server && npm run lint -w web"
+  },
+  "engines": { "node": ">=22" }
+}

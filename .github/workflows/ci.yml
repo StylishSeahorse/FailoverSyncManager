@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: failover
+          POSTGRES_PASSWORD: failover
+          POSTGRES_DB: failover_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U failover -d failover_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://failover:failover@localhost:5432/failover_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      # Tests use fake Cloudflare, Proxmox and NPM servers on 127.0.0.1;
+      # a guard in test/setup.ts fails any attempt to reach another host.
+      - run: npm test
+      - run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --target server -t failover-controller-server .
+      - run: docker build --target web -t failover-controller-web .
